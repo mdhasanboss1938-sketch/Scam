@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>WORMY - Worm Farm</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg-color: #f7f9f6;
+    --card-green: #2b5c3d;
+    --card-green-light: #3a7551;
+    --text-dark: #173020;
+    --text-light: #839788;
+    --white: #ffffff;
+    --surface: #f0f4ef;
+    --surface-border: #e2e8e1;
+    --radius-lg: 24px;
+    --radius-md: 16px;
+    --radius-sm: 12px;
+    --shadow-soft: 0 8px 24px rgba(23, 48, 32, 0.06);
+    --shadow-green: 0 10px 30px rgba(43, 92, 61, 0.2);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+  body { background-color: var(--bg-color); color: var(--text-dark); min-height: 100vh; overflow-x: hidden; }
+
+  /* =========== AUTH SCREEN =========== */
+  #authScreen {
+    position: fixed; inset: 0; background: var(--bg-color); z-index: 9999;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
+  }
+  .auth-box {
+    background: var(--white); padding: 30px 20px; border-radius: var(--radius-lg);
+    width: 100%; max-width: 400px; box-shadow: var(--shadow-soft); border: 1px solid var(--surface-border);
+  }
+  .auth-logo { text-align: center; margin-bottom: 24px; }
+  .auth-logo h1 { font-size: 28px; color: var(--card-green); font-weight: 900; letter-spacing: -0.5px;}
+  .auth-logo p { font-size: 12px; color: var(--text-light); font-weight: 700; letter-spacing: 1px;}
+  
+  .auth-tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid var(--surface); }
+  .auth-tab { flex: 1; padding: 10px; text-align: center; font-weight: 800; color: var(--text-light); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+  .auth-tab.active { color: var(--card-green); border-bottom-color: var(--card-green); }
+
+  .auth-input { width: 100%; padding: 14px; margin-bottom: 12px; border: 1px solid var(--surface-border); border-radius: var(--radius-md); font-size: 14px; outline: none; background: var(--bg-color); }
+  .auth-input:focus { border-color: var(--card-green); }
+  
+  .auth-btn { width: 100%; padding: 16px; border-radius: var(--radius-md); background: var(--card-green); color: var(--white); border: none; font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 10px; }
+  .auth-error { color: #ef4444; font-size: 12px; text-align: center; margin-top: 10px; font-weight: 600; display: none;}
+
+  /* 🎁 Welcome bonus hint on register */
+  .auth-bonus {
+    text-align: center; font-size: 12px; font-weight: 800; color: var(--card-green);
+    background: #e8f2eb; padding: 10px 12px; border-radius: 12px; margin-top: 14px;
+    border: 1px dashed #b9d8c5;
+  }
+
+  /* =========== APP UI =========== */
+  #appUI { display: none; padding-bottom: 90px; }
+  
+  .header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; }
+  .logo-area { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { font-size: 32px; line-height: 1; }
+  .logo-text { font-weight: 900; font-size: 24px; color: var(--card-green); letter-spacing: -0.5px; line-height: 1; }
+  .logo-sub { font-size: 9px; color: var(--text-light); font-weight: 800; letter-spacing: 1.5px; margin-top: 2px;}
+
+  .balance-card { margin: 0 20px 24px; padding: 24px; background: linear-gradient(145deg, var(--card-green), var(--card-green-light)); border-radius: var(--radius-lg); color: var(--white); position: relative; box-shadow: var(--shadow-green); overflow: hidden; }
+  .wallet-illustration { position: absolute; right: 20px; top: 20px; font-size: 50px; opacity: 0.9; }
+  .bc-label { font-size: 11px; font-weight: 800; letter-spacing: 1px; opacity: 0.7; margin-bottom: 8px; }
+  .bc-amount { font-size: 38px; font-weight: 900; display: flex; align-items: flex-end; gap: 6px; }
+  .bc-amount span { font-size: 14px; font-weight: 700; opacity: 0.7; margin-bottom: 6px; }
+  .bc-divider { height: 1px; background: rgba(255,255,255,0.15); margin: 16px 0; width: 60%; }
+  .bc-income { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; width: 100%; }
+  .bc-income span { color: #a4d3b5; }
+
+  .section-title { padding: 0 20px; margin-bottom: 16px; font-size: 22px; font-weight: 900; color: var(--text-dark); }
+  
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .worm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 20px; }
+  .worm-card { background: var(--white); border-radius: 20px; padding: 16px; display: flex; flex-direction: column; box-shadow: var(--shadow-soft); border: 1px solid var(--surface-border); position: relative; }
+  .wc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .wc-percent { background: #d4e8db; color: var(--card-green); padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 900; }
+  .wc-image { width: 100%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, #e5efe2 0%, #f7f9f6 100%); display: flex; justify-content: center; align-items: center; margin-bottom: 16px; font-size: 60px; }
+  .wc-title { font-size: 16px; font-weight: 900; margin-bottom: 4px; }
+  .wc-rarity { font-size: 11px; color: var(--text-light); margin-bottom: 12px; font-weight: 700;}
+  .wc-income { background: var(--bg-color); border-radius: var(--radius-sm); padding: 10px 12px; display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 12px; font-weight: 700; }
+  .wc-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: auto; }
+  .wc-price { font-size: 18px; font-weight: 900; }
+  .btn-buy { background: var(--card-green); color: var(--white); border: none; padding: 10px 16px; border-radius: 12px; font-weight: 800; font-size: 13px; cursor: pointer; }
+  .worm-card.locked .wc-image { filter: grayscale(100%) opacity(0.6); }
+  .worm-card.locked .btn-buy { background: #e5e9e4; color: #9fb0a3; cursor: not-allowed; }
+
+  /* History / Orders list style */
+  .history-list { padding: 0 20px; display: flex; flex-direction: column; gap: 12px; }
+  .history-card { background: var(--white); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--surface-border); box-shadow: var(--shadow-soft); display: flex; justify-content: space-between; align-items: center; }
+  .history-info h4 { font-size: 15px; font-weight: 900; color: var(--text-dark); margin-bottom: 4px; }
+  .history-info p { font-size: 12px; color: var(--text-light); font-weight: 700; }
+  .history-profit { text-align: right; }
+  .history-profit h3 { font-size: 16px; font-weight: 900; color: var(--card-green); }
+  .history-profit span { font-size: 11px; color: var(--text-light); font-weight: 700; }
+
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--white); display: flex; justify-content: space-around; padding: 12px 0 max(12px, env(safe-area-inset-bottom)); box-shadow: 0 -4px 20px rgba(0,0,0,0.04); border-top-left-radius: 24px; border-top-right-radius: 24px; z-index: 100; }
+  .nav-item { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text-light); font-size: 11px; font-weight: 800; text-decoration: none; cursor: pointer; padding-bottom: 6px; }
+  .nav-icon { font-size: 26px; }
+  .nav-item.active { color: var(--card-green); }
+
+  /* Modals */
+  .overlay { position: fixed; inset: 0; background: rgba(23, 48, 32, 0.5); backdrop-filter: blur(4px); z-index: 900; display: none; opacity: 0; transition: opacity 0.3s; }
+  .overlay.show { display: block; opacity: 1; }
+  .bottom-sheet { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg-color); border-top-left-radius: 30px; border-top-right-radius: 30px; z-index: 1000; padding: 24px 20px; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.1, 0.7, 0.1, 1); max-height: 95vh; overflow-y: auto; }
+  .bottom-sheet.show { transform: translateY(0); }
+  .bs-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .bs-title { font-size: 26px; font-weight: 900; color: var(--text-dark); }
+  .bs-close { width: 40px; height: 40px; border-radius: 50%; background: var(--white); border: none; font-size: 18px; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+  
+  .wallet-balance-card { background: var(--card-green); border-radius: var(--radius-lg); padding: 24px; color: var(--white); margin-bottom: 20px; box-shadow: var(--shadow-green); }
+  .wallet-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .wa-btn { background: var(--white); border-radius: var(--radius-lg); padding: 20px; text-align: left; border: 1px solid var(--surface-border); cursor: pointer; position: relative; }
+  .wa-btn h4 { font-size: 16px; color: var(--text-dark); margin: 12px 0 4px; font-weight: 900; }
+  .wa-btn p { font-size: 12px; color: var(--text-light); font-weight: 600;}
+  .wa-icon { font-size: 32px; }
+
+  .form-label { font-size: 14px; font-weight: 900; color: var(--text-dark); margin-bottom: 12px; display: block; }
+  .deposit-address-box { background: var(--white); border: 2px dashed var(--card-green); border-radius: var(--radius-md); padding: 16px; text-align: center; margin-bottom: 20px; }
+  .deposit-address-box h3 { font-size: 15px; font-weight: 900; word-break: break-all; }
+  .copy-btn { background: var(--card-green); color: var(--white); border: none; padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 800; margin-top: 12px; cursor: pointer; }
+  
+  .amount-input { background: var(--white); border: 1px solid var(--surface-border); border-radius: var(--radius-md); padding: 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .amount-input input { border: none; outline: none; font-size: 36px; font-weight: 900; width: 100%; background: transparent; }
+  .wallet-address { width: 100%; background: var(--white); border: 1px solid var(--surface-border); border-radius: var(--radius-md); padding: 16px; min-height: 80px; resize: none; outline: none; margin-bottom: 24px; }
+  .btn-primary { width: 100%; padding: 18px; border-radius: var(--radius-md); background: var(--card-green); color: var(--white); border: none; font-size: 16px; font-weight: 900; cursor: pointer; margin-top: 20px; }
+  .profile-card { background: var(--white); border-radius: var(--radius-md); padding: 20px; margin-bottom: 20px; font-size: 14px; font-weight: 600; border: 1px solid var(--surface-border); }
+  .menu-list { display: flex; flex-direction: column; gap: 12px; }
+  .menu-item { background: var(--white); padding: 16px; border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 14px; border: 1px solid var(--surface-border); cursor: pointer; }
+
+  /* Toast */
+  .toast {
+    position: fixed; top: 20px; left: 50%; transform: translate(-50%, -160%);
+    background: var(--card-green); color: #fff; padding: 14px 22px; border-radius: 14px;
+    font-weight: 800; font-size: 13px; z-index: 3000; transition: transform .35s ease;
+    box-shadow: var(--shadow-green); text-align: center; max-width: 90%;
+  }
+  .toast.show { transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="authScreen">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <h1>🪱 WORMY</h1>
+      <p>WORM FARM</p>
+    </div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Login</div>
+      <div class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">Register</div>
+    </div>
+    <div id="loginForm">
+      <input type="email" id="loginEmail" class="auth-input" placeholder="Email Address">
+      <input type="password" id="loginPassword" class="auth-input" placeholder="Password">
+      <button class="auth-btn" onclick="handleLogin()">Sign In</button>
+    </div>
+    <div id="registerForm" style="display: none;">
+      <input type="text" id="regName" class="auth-input" placeholder="Your Name">
+      <input type="email" id="regEmail" class="auth-input" placeholder="Email Address">
+      <input type="password" id="regPassword" class="auth-input" placeholder="Password (min 6 chars)">
+      <button class="auth-btn" onclick="handleRegister()">Create Account</button>
+      <div class="auth-bonus" id="welcomeBonusHint">🎁 New users get a welcome bonus!</div>
+    </div>
+    <div id="authError" class="auth-error"></div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="appUI">
+  <header class="header">
+    <div class="logo-area">
+      <div class="logo-icon">🪱</div>
+      <div>
+        <div class="logo-text">WORMY</div>
+        <div class="logo-sub">WORM FARM</div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="balance-card">
+      <div class="wallet-illustration">👛</div>
+      <div class="bc-label">YOUR BALANCE</div>
+      <div class="bc-amount" id="mainBalance">$0.00 <span>USD</span></div>
+      <div class="bc-divider"></div>
+      <div class="bc-income">
+        <div>Your worms' income</div>
+        <div id="totalIncomeRate">$0.00 / day</div>
+      </div>
+    </div>
+
+    <!-- TAB 1: WORMS (SHOP) -->
+    <div class="tab-content active" id="tab-worms">
+      <div class="section-title">Worm collection</div>
+      <div class="worm-grid" id="wormGrid"></div>
+    </div>
+
+    <!-- TAB 2: HISTORY / ORDERS -->
+    <div class="tab-content" id="tab-history">
+      <div class="section-title">My Worm Orders & History</div>
+      <div class="history-list" id="historyList">
+        <p style="text-align:center; color:var(--text-light); font-weight:700; padding:20px;">No purchases yet.</p>
+      </div>
+    </div>
+  </main>
+
+  <nav class="bottom-nav">
+    <div class="nav-item active" onclick="switchMainTab('worms', this)">
+      <div class="nav-icon">🪱</div>
+      <span>Worms</span>
+    </div>
+    <div class="nav-item" onclick="switchMainTab('history', this)">
+      <div class="nav-icon">📜</div>
+      <span>History</span>
+    </div>
+    <div class="nav-item" onclick="openModal('walletModal')">
+      <div class="nav-icon">👛</div>
+      <span>Wallet</span>
+    </div>
+    <div class="nav-item" onclick="openModal('profileModal')">
+      <div class="nav-icon">⚙️</div>
+      <span>Profile</span>
+    </div>
+  </nav>
+</div>
+
+<!-- MODALS -->
+<div class="overlay" id="overlay" onclick="closeAllModals()"></div>
+
+<!-- Wallet Modal -->
+<div class="bottom-sheet" id="walletModal">
+  <div class="bs-header">
+    <div class="bs-title" style="font-size:24px;">Wallet</div>
+    <button class="bs-close" onclick="closeAllModals()">✕</button>
+  </div>
+  <div class="wallet-balance-card">
+    <div style="font-size:11px; font-weight:800; opacity:0.8; margin-bottom:8px;">AVAILABLE BALANCE</div>
+    <div style="font-size:36px; font-weight:900;" id="walletBalance">$0.00 USD</div>
+  </div>
+  <div class="wallet-actions">
+    <button class="wa-btn" onclick="openModal('depositModal')">
+      <div class="wa-icon">⬇️</div>
+      <h4>Top up</h4>
+      <p>Crypto Deposit</p>
+    </button>
+    <button class="wa-btn" onclick="openModal('withdrawModal')">
+      <div class="wa-icon">⬆️</div>
+      <h4>Withdraw</h4>
+      <p>Payout to wallet</p>
+    </button>
+  </div>
+</div>
+
+<!-- Deposit Modal -->
+<div class="bottom-sheet" id="depositModal">
+  <div class="bs-header">
+    <div class="bs-title" style="font-size:24px;">Deposit</div>
+    <button class="bs-close" onclick="closeAllModals()">✕</button>
+  </div>
+  <label class="form-label">Send USDT (BEP20) to:</label>
+  <div class="deposit-address-box">
+    <h3 id="adminWalletAddress">Loading...</h3>
+    <button class="copy-btn" onclick="copyAdminAddress()">📋 Copy Address</button>
+  </div>
+  <label class="form-label">Amount ($)</label>
+  <div class="amount-input"><input type="number" id="depositAmount" placeholder="0.00"></div>
+  <label class="form-label">Transaction ID (TxID)</label>
+  <textarea class="wallet-address" id="depositProof" placeholder="Paste TxID..."></textarea>
+  <button class="btn-primary" onclick="processDeposit()">Submit Request</button>
+</div>
+
+<!-- Withdraw Modal -->
+<div class="bottom-sheet" id="withdrawModal">
+  <div class="bs-header">
+    <div class="bs-title" style="font-size:24px;">Withdraw</div>
+    <button class="bs-close" onclick="closeAllModals()">✕</button>
+  </div>
+  <label class="form-label" id="availableToWithdraw">Available: $0.00</label>
+  <div class="amount-input"><input type="number" id="withdrawAmount" placeholder="0.00"></div>
+  <label class="form-label">BEP20 Wallet Address</label>
+  <textarea class="wallet-address" id="withdrawAddress" placeholder="Paste address..."></textarea>
+  <button class="btn-primary" onclick="processWithdraw()">Confirm Withdrawal</button>
+</div>
+
+<!-- Profile Modal -->
+<div class="bottom-sheet" id="profileModal">
+  <div class="bs-header">
+    <div class="bs-title">Profile</div>
+    <button class="bs-close" onclick="closeAllModals()">✕</button>
+  </div>
+  <div class="profile-card" id="profileInfo">Loading...</div>
+  <div class="menu-list">
+    <div class="menu-item" id="supportMenu">💬 Support ↗</div>
+    <div class="menu-item" style="color:#ef4444; border-color:#fca5a5;" onclick="handleLogout()">🚪 Logout</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- FIREBASE SCRIPT -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-analytics.js";
+  import { getFirestore, doc, getDoc, setDoc, collection, getDocs, addDoc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+  import { getAuth, setPersistence, browserLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyA6mz2cpe70OggPqons909pG74051BQxR8",
+    authDomain: "worm-91237.firebaseapp.com",
+    projectId: "worm-91237",
+    storageBucket: "worm-91237.firebasestorage.app",
+    messagingSenderId: "214930058507",
+    appId: "1:214930058507:web:567fa6d714956799a1060e",
+    measurementId: "G-VNCSBR14ES"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+
+  setPersistence(auth, browserLocalPersistence).catch(console.error);
+
+  // 🎁 নতুন ইউজারের ওয়েলকাম বোনাস (ডিফল্ট)
+  const DEFAULT_WELCOME_BONUS = 0.05;
+
+  let currentUser = null;
+  let currentUserId = null;
+  let allWorms = [];
+  let userPurchases = [];
+  let adminWalletAddress = "0x1234567890abcdef1234567890abcdef12345678";
+  let supportLinkUrl = "https://t.me/YourSupportUsername";
+
+  /* ---------- Toast ---------- */
+  let toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.innerText = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+  }
+
+  /* ---------- Public settings (বোনাস হিন্ট দেখানোর জন্য) ---------- */
+  async function loadPublicSettings() {
+    try {
+      const snap = await getDoc(doc(db, "settings", "config"));
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.startBalance !== undefined && data.startBalance !== null) {
+          const hint = document.getElementById('welcomeBonusHint');
+          if (hint) hint.innerText = `🎁 New users get $${Number(data.startBalance).toFixed(2)} welcome bonus!`;
+        }
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  window.switchAuthTab = function(tab) {
+    document.getElementById('authError').style.display = 'none';
+    if(tab === 'login') {
+      document.getElementById('tabLogin').classList.add('active');
+      document.getElementById('tabRegister').classList.remove('active');
+      document.getElementById('loginForm').style.display = 'block';
+      document.getElementById('registerForm').style.display = 'none';
+    } else {
+      document.getElementById('tabRegister').classList.add('active');
+      document.getElementById('tabLogin').classList.remove('active');
+      document.getElementById('registerForm').style.display = 'block';
+      document.getElementById('loginForm').style.display = 'none';
+    }
+  }
+
+  function showAuthError(msg) {
+    const err = document.getElementById('authError');
+    err.innerText = msg;
+    err.style.display = 'block';
+  }
+
+  window.handleRegister = async function() {
+    const name = document.getElementById('regName').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    const pass = document.getElementById('regPassword').value;
+    if(!name || !email || pass.length < 6) return showAuthError("Fill all fields. Pass min 6 chars.");
+
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+
+      // 🎁 ওয়েলকাম বোনাস লোড (সেটিংস থেকে, না থাকলে 0.05)
+      let startBal = DEFAULT_WELCOME_BONUS;
+      try {
+        const setSnap = await getDoc(doc(db, "settings", "config"));
+        if (setSnap.exists()) {
+          const v = setSnap.data().startBalance;
+          if (v !== undefined && v !== null && !isNaN(Number(v))) startBal = Number(v);
+        }
+      } catch (e) { /* fallback 0.05 */ }
+
+      await setDoc(doc(db, "users", cred.user.uid), {
+        first_name: name,
+        email,
+        balance: startBal,
+        is_blocked: false,
+        welcome_bonus: startBal,
+        created_at: new Date().toISOString()
+      });
+
+      showToast(`🎁 Welcome ${name}! $${startBal.toFixed(2)} bonus added.`);
+    } catch(e) { showAuthError(e.message); }
+  }
+
+  window.handleLogin = async function() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const pass = document.getElementById('loginPassword').value;
+    if(!email || !pass) return showAuthError("Enter email and password.");
+    try { await signInWithEmailAndPassword(auth, email, pass); }
+    catch(e) { showAuthError("Invalid email or password."); }
+  }
+
+  window.handleLogout = async function() { await signOut(auth); location.reload(); }
+
+  onAuthStateChanged(auth, async (user) => {
+    if(user) {
+      currentUserId = user.uid;
+      document.getElementById('authScreen').style.display = 'none';
+      document.getElementById('appUI').style.display = 'block';
+      await loadGameData();
+    } else {
+      document.getElementById('authScreen').style.display = 'flex';
+      document.getElementById('appUI').style.display = 'none';
+    }
+  });
+
+  async function loadGameData() {
+    try {
+      const uSnap = await getDoc(doc(db, "users", currentUserId));
+      if(uSnap.exists()) {
+        currentUser = uSnap.data();
+        if(currentUser.is_blocked) { alert("Account blocked!"); handleLogout(); return; }
+      } else {
+        // 🎁 নতুন ইউজার ডকুমেন্ট তৈরি (ডিফল্ট 0.05)
+        currentUser = {
+          first_name: "User",
+          email: auth.currentUser.email,
+          balance: DEFAULT_WELCOME_BONUS,
+          is_blocked: false,
+          welcome_bonus: DEFAULT_WELCOME_BONUS
+        };
+        await setDoc(doc(db, "users", currentUserId), currentUser);
+      }
+
+      const setSnap = await getDoc(doc(db, "settings", "config"));
+      if(setSnap.exists()) {
+        if(setSnap.data().adminWallet) adminWalletAddress = setSnap.data().adminWallet;
+        if(setSnap.data().supportLink) supportLinkUrl = setSnap.data().supportLink;
+      }
+
+      const wormsSnap = await getDocs(collection(db, "worms"));
+      allWorms = [];
+      wormsSnap.forEach(d => allWorms.push({ id: d.id, ...d.data() }));
+      if(allWorms.length === 0) {
+        allWorms = [
+          { id: '1', name: "Novice", rarity: "Common", percent: "8%", income_day: "1.20", price: 10, locked: false, img: "🍄" },
+          { id: '2', name: "Captain", rarity: "Rare", percent: "10%", income_day: "2.80", price: 20, locked: true, img: "🍄" }
+        ];
+      }
+
+      // Load User Purchases / History
+      const txSnap = await getDocs(query(collection(db, "transactions"), where("user_id", "==", currentUserId)));
+      userPurchases = [];
+      txSnap.forEach(d => userPurchases.push(d.data()));
+
+      renderUI();
+    } catch(e) { console.error(e); }
+  }
+
+  window.switchMainTab = function(tabName, el) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById(`tab-${tabName}`).classList.add('active');
+    el.classList.add('active');
+  }
+
+  window.openModal = function(id) {
+    closeAllModals();
+    document.getElementById('overlay').classList.add('show');
+    document.getElementById(id).classList.add('show');
+    if(id === 'withdrawModal') document.getElementById('availableToWithdraw').innerText = `Available: $${(currentUser?.balance || 0).toFixed(2)}`;
+    if(id === 'depositModal') document.getElementById('adminWalletAddress').innerText = adminWalletAddress;
+    if(id === 'profileModal') {
+      document.getElementById('profileInfo').innerHTML = `<b>Name:</b> ${currentUser?.first_name}<br><b>Email:</b> ${currentUser?.email}<br><b>Balance:</b> $${(currentUser?.balance||0).toFixed(2)}`;
+    }
+  }
+
+  window.closeAllModals = function() {
+    document.getElementById('overlay').classList.remove('show');
+    document.querySelectorAll('.bottom-sheet').forEach(el => el.classList.remove('show'));
+  }
+
+  window.copyAdminAddress = function() { navigator.clipboard.writeText(adminWalletAddress).then(() => alert("✅ Copied!")); }
+
+  window.buyWorm = async function(id) {
+    const worm = allWorms.find(w => w.id === id);
+    if(worm.locked) return alert("Locked! Buy previous worm first.");
+    if((currentUser?.balance || 0) < worm.price) return alert("Insufficient balance!");
+
+    try {
+      const newBal = currentUser.balance - worm.price;
+      await updateDoc(doc(db, "users", currentUserId), { balance: newBal });
+
+      const txData = {
+        user_id: currentUserId,
+        type: `Bought ${worm.name}`,
+        worm_name: worm.name,
+        amount: -worm.price,
+        income_day: worm.income_day,
+        created_at: new Date().toISOString()
+      };
+      await addDoc(collection(db, "transactions"), txData);
+
+      currentUser.balance = newBal;
+      alert(`Successfully bought ${worm.name}!`);
+      loadGameData();
+    } catch(e) { alert("Purchase failed."); }
+  }
+
+  window.processDeposit = async function() {
+    const amount = parseFloat(document.getElementById('depositAmount').value);
+    const proof = document.getElementById('depositProof').value.trim();
+    if(!amount || amount < 1 || !proof) return alert("Enter valid amount & TxID!");
+
+    await addDoc(collection(db, "deposits"), { user_id: currentUserId, amount, proof, status: "pending", created_at: new Date().toISOString() });
+    closeAllModals(); alert("Deposit request submitted!");
+  }
+
+  window.processWithdraw = async function() {
+    const amount = parseFloat(document.getElementById('withdrawAmount').value);
+    const address = document.getElementById('withdrawAddress').value.trim();
+    if(!amount || amount < 1 || amount > currentUser.balance || !address) return alert("Invalid withdrawal data!");
+
+    const newBal = currentUser.balance - amount;
+    await updateDoc(doc(db, "users", currentUserId), { balance: newBal });
+    await addDoc(collection(db, "withdrawals"), { user_id: currentUserId, amount, address, status: "pending", created_at: new Date().toISOString() });
+    currentUser.balance = newBal;
+    renderUI(); closeAllModals(); alert("Withdrawal request submitted!");
+  }
+
+  document.getElementById('supportMenu').onclick = () => window.open(supportLinkUrl, '_blank');
+
+  function renderUI() {
+    if(!currentUser) return;
+    const bal = currentUser.balance || 0;
+    document.getElementById('mainBalance').innerHTML = `$${bal.toFixed(2)} <span>USD</span>`;
+    document.getElementById('walletBalance').innerHTML = `$${bal.toFixed(2)} USD`;
+
+    // Calculate total daily income from user purchases
+    let totalDailyIncome = 0;
+    userPurchases.forEach(tx => {
+      if(tx.income_day) totalDailyIncome += parseFloat(tx.income_day);
+    });
+    document.getElementById('totalIncomeRate').innerText = `$${totalDailyIncome.toFixed(2)} / day`;
+
+    // Render Store Grid
+    document.getElementById('wormGrid').innerHTML = allWorms.map(w => `
+      <div class="worm-card ${w.locked ? 'locked' : ''}">
+        <div class="wc-top"><div class="wc-percent">${w.percent}</div></div>
+        <div class="wc-image">${w.img || '🍄'}</div>
+        <div class="wc-title">${w.name}</div>
+        <div class="wc-rarity">${w.rarity}</div>
+        <div class="wc-income"><span>Income/day</span><span>$${w.income_day}</span></div>
+        <div class="wc-bottom">
+          <div class="wc-price">$${w.price}</div>
+          <button class="btn-buy" onclick="buyWorm('${w.id}')">${w.locked ? 'Locked' : 'Buy'}</button>
+        </div>
+      </div>
+    `).join('');
+
+    // Render History / Orders Tab
+    const historyContainer = document.getElementById('historyList');
+    const buys = userPurchases.filter(tx => tx.worm_name);
+    if(buys.length === 0) {
+      historyContainer.innerHTML = `<p style="text-align:center; color:var(--text-light); font-weight:700; padding:20px;">No worm orders found.</p>`;
+    } else {
+      historyContainer.innerHTML = buys.map(b => {
+        const dateStr = new Date(b.created_at).toLocaleString();
+        return `
+          <div class="history-card">
+            <div class="history-info">
+              <h4>🪱 ${b.worm_name}</h4>
+              <p>Purchased: ${dateStr}</p>
+              <p style="color:var(--card-green); margin-top:2px;">Earning: $${b.income_day} / day</p>
+            </div>
+            <div class="history-profit">
+              <h3>$${Math.abs(b.amount)}</h3>
+              <span>Spent</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  // পেজ লোডেই বোনাস হিন্ট আপডেট
+  loadPublicSettings();
+</script>
+</body>
+</html>
